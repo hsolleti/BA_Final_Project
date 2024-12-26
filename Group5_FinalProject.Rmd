@@ -1,0 +1,254 @@
+---
+title: "Group-5 Final Project"
+author: "Harini, Likitha, Jaswanth, Nanaji"
+date: "2023-12-13"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+***
+
+###Problem Statement.
+Zillow's Zestimate home valuation has shaken up the U.S. real estate industry since first released 11 years ago. A home is often the largest and most expensive purchase a person makes in his or her lifetime.Ensuring homeowners have a trusted way to monitor this asset is incredibly important. The Zestimate was created to give consumers as much information as possible about homes and the housing market, marking the first-time consumers had access to this type of home value information at no cost. "Zestimates" are estimated home values based on 7.5 million statistical and machine learning models that analyze hundreds of data points on each property. And, by continually improving the median margin of error (from 14% at the onset to 5% today), Zillow has since become established as one of the largest, most trusted marketplaces for real estate information in the U.S. and a leading example of impactful machine learning. This project is the very simplified version of Zillow Prize competition. Zillow Prize was a competition with a one-million-dollar grand prize with the objective to help push the accuracy of the Zestimate even further. Winning algorithms stand to impact the home values of 110M homes across the U.S.
+
+***
+
+```{r}
+#Loading the necessary libraries.
+library(stats)
+library(ggplot2)
+library(caret)
+library(dplyr)
+library(ISLR)
+library(rpart)
+library(rpart.plot)
+library(readxl)
+library(corrplot)
+```
+```{r}
+#Importing the datasets.
+HP_train<- read.csv("C:/R History/House_Prices.csv")
+
+BA_pred_test <- read.csv("C:/R History/BA-Predict.csv")
+```
+```{r}
+#Printing first few rows of the dataset.
+head(HP_train)
+head(BA_pred_test)
+```
+
+```{r}
+#Shape of the datasets.
+dim(HP_train)
+dim(BA_pred_test)
+```
+
+```{r}
+#Printing the structure of the data.
+str(HP_train)
+```
+#Segmantation of the data into the numerical and categorical values is not necessary since all the variables in this dataset are numerical.
+```{r}
+summary(HP_train)
+```
+```{r}
+#Checking the missing values.
+missing_values<- colSums(is.na(HP_train))
+print(missing_values)
+```
+```{r}
+cat("From the above data its clear that there are no missing data in the training set")
+```
+```{r}
+#Visualizing the missing values.
+barplot(missing_values,main = "Null Values", xlab = "Variables", ylab = "Count")
+```
+```{r}
+#Boxplots to check the outliers.
+numeric_vars <- c("LotArea", "OverallQual", "YearBuilt", "YearRemodAdd", "BsmtFinSF1",
+                  "FullBath", "HalfBath", "BedroomAbvGr", "TotRmsAbvGrd", "Fireplaces",
+                  "GarageArea", "YrSold", "SalePrice")
+
+par(mfrow = c(2, 3))
+
+# Create boxplots for each numerical variable
+for (var in numeric_vars) {
+  # Check if the variable exists in the dataset before plotting
+  if (var %in% colnames(HP_train)) {
+    # Plot the boxplot if the variable exists
+    boxplot(HP_train[[var]], main = var)
+  } else {
+    # Print a message if the variable doesn't exist in the dataset
+    cat("Variable", var, "does not exist in the dataset.\n")
+  }
+}
+```
+
+#Variable selection
+
+##Coreelation plots and ANOVA can effectively indicate the significance of variables concerning thei impact on the sale price.
+```{r}
+
+# Compute correlation matrix
+cor_mat <- cor(HP_train)
+
+# Convert correlation matrix to a data frame
+cor_df <- reshape2::melt(cor_mat)
+
+# Define a custom color palette (you can choose colors as needed)
+Colours <- colorRampPalette(c("green", "white", "orange"))(20)
+
+# Visualize correlations with the specified color palette
+corrplot::corrplot(cor_mat, method = "square", col = Colours)
+
+
+
+```
+
+```{r}
+# Creating correlation heatmap.
+corrplot(cor_mat, method = "color", type = "upper", tl.col = "red",
+tl.srt = 60, tl.cex = 0.8, tl.offset = 1, cl.lim = c(-1, 1),
+addCoef.col = "red", number.cex = 0.8, number.digits = 1,
+diag = FALSE, outline = TRUE)
+```
+
+###INTERPRETATION:
+Correlation analysis reveals the relationships and strengths of associations between variables, which aids in understanding how they may influence one another or a specific target variable under investigation. 
+Correlation values quantify the degree and direction of a linear relationship between two variables. They are numbered from -1 to 1, with 1 indicating perfect positive correlation, -1 indicating perfect negative correlation, and 0 indicating no linear relationship between the variables.
+BedroomAbvGr and YrSold have weak or negligible linear relationships with the objective variable, according to the plots.
+
+###ANOVA
+```{r}
+#Using ANOVA
+anova_model<- aov(SalePrice~.,data = HP_train)
+anova_result<- anova(anova_model)
+print(anova_result)
+```
+
+###INTERPRETATION
+The p-value is a measure that helps determine the significance of the relationship between variables in statistical tests.
+
+Smaller p-value suggests stronger evidence against the null hypothesis, indicating a more significant relationship or effect in the data. optimum p-value ust be less than 0.05.
+
+From the above data BedroomAbvGr and YrSold doesnt have any significance on the response that is SalePrice.
+Hence the selected variables for the analysis are
+
+1.LotArea
+2.OverallQual
+3.YearBuilt 4.YearRemodAdd
+5.BsmtFinSF1 6.FullBath
+7.HalfBath 8.TotRmsAbvGrd
+9.Fireplaces 10 GarageArea
+
+__A.__ Build a regression and decision tree model that can accurately predict the price of a house based on several predictors.
+__1.__ Regression Model
+```{r}
+reg_model<- lm(SalePrice~
+                 LotArea+OverallQual+YearBuilt+YearRemodAdd+BsmtFinSF1+FullBath+HalfBath+TotRmsAbvGrd+Fireplaces+GarageArea, 
+               data= HP_train)
+
+summary(reg_model)
+```
+In a regression model, high p-values may suggest that those components are not statistically significant in predicting the target variable.
+
+So, take the necessary factors into account and rebuild the model. Based on the statistics presented above, the significant variables are as follows:
+1.LotArea
+2.OverallQual
+3.YearBuilt
+4.YearRemodAdd
+5.BsmtFinSF1
+6.TotRmsAbvGrd
+7.Fireplaces
+8.GarageArea
+
+```{r}
+reg_model_rev<- lm(SalePrice~
+                 LotArea+OverallQual+YearBuilt+YearRemodAdd+BsmtFinSF1+TotRmsAbvGrd+Fireplaces+GarageArea, 
+               data= HP_train)
+
+summary(reg_model_rev)
+```
+```{r}
+#Prediction model with the test data.
+prediction_reg <- predict(reg_model_rev, newdata = BA_pred_test, type = 'response')
+
+#Evaluation metrics.
+r_squared <- cor(BA_pred_test$SalePrice, prediction_reg)^2 
+cat("Linear Regression R-squared:\n", r_squared) 
+```
+```{r}
+rmse <- sqrt(mean((prediction_reg - BA_pred_test$SalePrice)^2))
+cat("\nLinear Regression RMSE:\n",rmse)
+```
+
+###INTERPRETATION
+The R2 is a statistic that shows how much variability in the dependent variable can be explained by the independent variables using regression models. R-squared refers to the measure of how well the predicted values correspond with the real data values and the degree of accuracy of a regression model.
+
+In this instance, the number is 0.823, meaning that the effects of 82.3% variance from the independent variables in the regression model explain the variance of the dependent response variable. This shows how close this model to the real data is and explains about 40% of changes observed for the dependent variable.
+
+__2.__ Decision Tree
+```{r}
+Dc_Tr<- rpart(SalePrice~
+                   LotArea + OverallQual + YearBuilt + 
+    YearRemodAdd + BsmtFinSF1  + TotRmsAbvGrd + 
+    Fireplaces + GarageArea, 
+    data = HP_train, 
+    method = 'anova',
+    control = rpart.control(ninsplit=60),maxdepth = 3)
+rpart.plot(Dc_Tr)
+```
+```{r}
+pred_DT<- predict(Dc_Tr, newdata = BA_pred_test)
+
+#evaluation metrics
+DT_r_squared <- cor(pred_DT, BA_pred_test$SalePrice)^2
+cat("Decision Tree R-squared:\n", DT_r_squared)
+```
+```{r}
+DT_rmse <- RMSE(pred_DT, BA_pred_test$SalePrice)
+cat("\nDecision Tree rsme:\n", DT_rmse)
+```
+__B.__ Using classification to model OverallQual (rating 7 and above consider as class 1, otherwise class zero).
+__3.__ Classification Model
+```{r}
+classification_Model <- glm(as.factor(ifelse(OverallQual >= 7, 1, 0)) ~ ., data = HP_train, family = 'binomial')
+summary(classification_Model)
+```
+```{r}
+# Making predictions on the test data.
+prob <- predict(classification_Model, newdata = BA_pred_test, type = "response")
+
+# Assigning classes based on a threshold.
+class_prediction <- as.factor(ifelse(prob >= 0.5, 1, 0))  
+
+# Creating confusion matrix on test data.
+confusionMatrix(class_prediction, as.factor(ifelse(BA_pred_test$OverallQual >= 7, 1, 0)), positive = "1")
+```
+###INTERPRETATION
+From the above analysis accuracy is 0.8333 Sensitivity : 0.8000
+Specificity : 0.8545
+
+###ANALYSIS & COMPARISION OF THREE MODELS.
+1.Regression Model
+Linear Regression R-squared:0.8232827
+Linear Regression RMSE:28237.95
+
+2.Decision Tree
+Decision Tree R-squared:0.6684661
+Decision Tree rsme:35864.1
+
+3.Classification analysis
+Accuracy : 0.8333
+Sensitivity : 0.8000
+Specificity : 0.8545
+
+The regression model has the highest R-squared value (0.823) when compared to the decision tree model (R-squared: 0.668), indicating stronger explanatory power. The regression model, on the other hand, has a lower error (RMSE: 28237.95) than the decision tree model.
+The classification analysis achieved an accuracy of 83.33%, showing the model’s ability to correctly classify instances. It also demonstrates good sensitivity (80.00%) and specificity (85.45%), indicating its capability to accurately identify positive and negative cases.
+Finally, the regression model has the most explanatory power, although the classification analysis has good accuracy and a decent mix of sensitivity and specificity. Despite its weaker performance measurements, the decision tree approach may nonetheless provide insights into nonlinear relationships in data.
+
+***
